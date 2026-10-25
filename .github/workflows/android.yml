@@ -37,6 +37,21 @@ jobs:
           gradle-version: '8.2'
       - name: Build debug APK
         run: gradle assembleDebug --no-daemon
+      - name: Verify APK signature matches cached keystore
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="app/build/outputs/apk/debug/app-debug.apk"
+          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          APKSIGNER="$(find "$SDK_ROOT/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          test -n "$APKSIGNER"
+          KEY_FP="$(keytool -list -v -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey | sed -n 's/.*SHA256: //p' | head -n 1 | tr -d ':' | tr '[:upper:]' '[:lower:]')"
+          APK_FP="$("$APKSIGNER" verify --print-certs "$APK" | sed -n 's/.*Signer #1 certificate SHA-256 digest: //p' | head -n 1 | tr -d ':' | tr '[:upper:]' '[:lower:]')"
+          echo "Cached keystore SHA-256: $KEY_FP"
+          echo "APK signing SHA-256:     $APK_FP"
+          test -n "$KEY_FP"
+          test -n "$APK_FP"
+          test "$KEY_FP" = "$APK_FP"
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
