@@ -82,14 +82,10 @@ class MainActivity : Activity() {
                 android.util.Log.w("StulogHaptics", "No vibrator reported by system")
                 false
             } else {
-                if (Build.VERSION.SDK_INT >= 33) {
-                    val attributes = android.os.VibrationAttributes.Builder()
-                        .setUsage(android.os.VibrationAttributes.USAGE_TOUCH)
-                        .build()
-                    vibrator.vibrate(effect, attributes)
-                } else {
-                    vibrator.vibrate(effect)
-                }
+                // Use direct vibration rather than USAGE_TOUCH, which may follow
+                // the device's system touch-haptics preference.
+                @Suppress("DEPRECATION")
+                vibrator.vibrate(effect)
                 true
             }
         } catch (e: Exception) {
@@ -134,19 +130,14 @@ class MainActivity : Activity() {
         @JavascriptInterface
         fun tapHaptic() {
             if (!hapticsEnabled()) return
-            // Keep the platform-standard UI tick, but do not rely on WebView to provide it.
-            runOnUiThread {
-                if (::webView.isInitialized) {
-                    webView.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP)
-                }
-            }
+            // Send a direct motor vibration; do not use Android's touch-haptics API.
             vibrateOnce(45L)
         }
 
         @JavascriptInterface
         fun testHaptics(): String {
             if (!hapticsEnabled()) {
-                return "触覚フィードバックがオフです。上のチェックをオンにしてください。"
+                return "アプリ内の振動設定がオフです。設定画面の振動スイッチをオンにしてください。"
             }
             return try {
                 val vibrator = defaultVibrator()
