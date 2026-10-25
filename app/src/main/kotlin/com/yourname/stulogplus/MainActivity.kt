@@ -60,6 +60,44 @@ class MainActivity : Activity() {
         else webView.restoreState(savedInstanceState)
     }
 
+    private fun hapticsEnabled(): Boolean =
+        getSharedPreferences(StudyReminderScheduler.PREFS, MODE_PRIVATE).getBoolean("haptics_enabled", true)
+
+    private fun defaultVibrator(): android.os.Vibrator =
+        if (Build.VERSION.SDK_INT >= 31) {
+            val manager = getSystemService(android.content.Context.VIBRATOR_MANAGER_SERVICE) as android.os.VibratorManager
+            manager.defaultVibrator
+        } else {
+            @Suppress("DEPRECATION")
+            getSystemService(VIBRATOR_SERVICE) as android.os.Vibrator
+        }
+
+    private fun vibrateOnce(durationMillis: Long): Boolean =
+        vibrateEffect(android.os.VibrationEffect.createOneShot(durationMillis, android.os.VibrationEffect.DEFAULT_AMPLITUDE))
+
+    private fun vibrateEffect(effect: android.os.VibrationEffect): Boolean {
+        return try {
+            val vibrator = defaultVibrator()
+            if (!vibrator.hasVibrator()) {
+                android.util.Log.w("StulogHaptics", "No vibrator reported by system")
+                false
+            } else {
+                if (Build.VERSION.SDK_INT >= 33) {
+                    val attributes = android.os.VibrationAttributes.Builder()
+                        .setUsage(android.os.VibrationAttributes.USAGE_TOUCH)
+                        .build()
+                    vibrator.vibrate(effect, attributes)
+                } else {
+                    vibrator.vibrate(effect)
+                }
+                true
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("StulogHaptics", "Vibration request failed", e)
+            false
+        }
+    }
+
     private inner class BackupBridge {
         @JavascriptInterface
         fun getReminderSettings(): String {
@@ -95,36 +133,47 @@ class MainActivity : Activity() {
 
         @JavascriptInterface
         fun tapHaptic() {
-            if (!getSharedPreferences(StudyReminderScheduler.PREFS, MODE_PRIVATE).getBoolean("haptics_enabled", true)) return
-            // Use Android's view-level haptic feedback for reliable tap feedback in WebView.
+            if (!hapticsEnabled()) return
+            // Keep the platform-standard UI tick, but do not rely on WebView to provide it.
             runOnUiThread {
                 if (::webView.isInitialized) {
                     webView.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP)
                 }
             }
-            // Keep a short vibrator fallback for devices where view haptics are subtle.
-            vibratePattern("[0,35]")
+            vibrateOnce(45L)
+        }
+
+        @JavascriptInterface
+        fun testHaptics(): String {
+            if (!hapticsEnabled()) {
+                return "触覚フィードバックがオフです。上のチェックをオンにしてください。"
+            }
+            return try {
+                val vibrator = defaultVibrator()
+                if (!vibrator.hasVibrator()) {
+                    "Androidが振動モーターを検出できませんでした。"
+                } else if (vibrateOnce(260L)) {
+                    "Androidから振動命令を送信しました（振動モーター検出: OK）。感じない場合は端末側の振動設定を確認してください。"
+                } else {
+                    "振動命令に失敗しました。Androidログに詳細を記録しました。"
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("StulogHaptics", "Haptic test failed", e)
+                "振動テストでエラーが発生しました: " + e.javaClass.simpleName
+            }
         }
 
         @JavascriptInterface
         fun vibratePattern(patternJson: String) {
-            if (!getSharedPreferences(StudyReminderScheduler.PREFS, MODE_PRIVATE).getBoolean("haptics_enabled", true)) return
+            if (!hapticsEnabled()) return
             try {
                 val timingsJson = org.json.JSONArray(patternJson)
                 val timings = LongArray(timingsJson.length()) { i -> timingsJson.optLong(i, 0L).coerceAtLeast(0L) }
                 if (timings.isEmpty()) return
-                val vibrator = if (Build.VERSION.SDK_INT >= 31) {
-                    val manager = getSystemService(android.content.Context.VIBRATOR_MANAGER_SERVICE) as android.os.VibratorManager
-                    manager.defaultVibrator
-                } else {
-                    @Suppress("DEPRECATION")
-                    getSystemService(VIBRATOR_SERVICE) as android.os.Vibrator
-                }
-                if (vibrator.hasVibrator()) {
-                    if (Build.VERSION.SDK_INT >= 26) vibrator.vibrate(android.os.VibrationEffect.createWaveform(timings, -1))
-                    else vibrator.vibrate(timings, -1)
-                }
-            } catch (_: Exception) { }
+                vibrateEffect(android.os.VibrationEffect.createWaveform(timings, -1))
+            } catch (e: Exception) {
+                android.util.Log.e("StulogHaptics", "Pattern vibration failed", e)
+            }
         }
         @JavascriptInterface
         fun saveBackup(json: String) {
