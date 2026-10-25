@@ -94,6 +94,19 @@ class MainActivity : Activity() {
         }
 
         @JavascriptInterface
+        fun tapHaptic() {
+            if (!getSharedPreferences(StudyReminderScheduler.PREFS, MODE_PRIVATE).getBoolean("haptics_enabled", true)) return
+            // Use Android's view-level haptic feedback for reliable tap feedback in WebView.
+            runOnUiThread {
+                if (::webView.isInitialized) {
+                    webView.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP)
+                }
+            }
+            // Keep a short vibrator fallback for devices where view haptics are subtle.
+            vibratePattern("[0,35]")
+        }
+
+        @JavascriptInterface
         fun vibratePattern(patternJson: String) {
             if (!getSharedPreferences(StudyReminderScheduler.PREFS, MODE_PRIVATE).getBoolean("haptics_enabled", true)) return
             try {
