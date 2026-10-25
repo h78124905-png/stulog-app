@@ -81,6 +81,19 @@ class MainActivity : Activity() {
         }
 
         @JavascriptInterface
+        fun setHapticsEnabled(enabled: Boolean) {
+            getSharedPreferences(StudyReminderScheduler.PREFS, MODE_PRIVATE).edit().putBoolean("haptics_enabled", enabled).apply()
+        }
+
+        @JavascriptInterface
+        fun setStudyActive(active: Boolean) {
+            getSharedPreferences(StudyReminderScheduler.PREFS, MODE_PRIVATE).edit()
+                .putBoolean("study_active", active)
+                .putLong("study_active_until", if (active) System.currentTimeMillis() + 3 * 60 * 60 * 1000L else 0L)
+                .apply()
+        }
+
+        @JavascriptInterface
         fun vibratePattern(patternJson: String) {
             if (!getSharedPreferences(StudyReminderScheduler.PREFS, MODE_PRIVATE).getBoolean("haptics_enabled", true)) return
             try {
