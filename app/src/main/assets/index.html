@@ -304,7 +304,7 @@ button:focus-visible,[role="button"]:focus-visible,input:focus-visible,select:fo
       <h3>やる気スイッチ</h3>
       <p class="small" style="line-height:1.7;margin:8px 0 12px;">操作したときの音や振動を、自分が心地よい設定に。</p>
       <label style="display:flex;align-items:center;gap:10px;margin:12px 0;font-size:14px;"><input id="appSoundEnabled" type="checkbox" checked style="width:20px;height:20px;">効果音を鳴らす</label>
-      <label style="display:flex;align-items:center;gap:10px;margin:12px 0;font-size:14px;"><input id="appHapticsEnabled" type="checkbox" checked style="width:20px;height:20px;">触覚フィードバックを使う</label>
+      <label style="display:flex;align-items:center;gap:10px;margin:12px 0;font-size:14px;"><input id="appHapticsEnabled" type="checkbox" checked style="width:20px;height:20px;">アプリ内の振動を使う</label>
       <div class="small" id="effectsStatus" aria-live="polite">効果音と振動はオンです。</div>
       <button class="pill ghost w-full" id="btnTestHaptics" type="button" data-no-sound style="margin-top:10px;">振動をテスト</button>
     </div>
@@ -770,7 +770,7 @@ $('btnReset').onclick=()=>{if(!confirm('本当にすべてのデータを削除�
 function initAppSettings(){
   const sound=$('appSoundEnabled'),haptics=$('appHapticsEnabled'),effects=$('effectsStatus');
   sound.checked=appSoundEnabled;haptics.checked=appHapticsEnabled;
-  const updateEffects=()=>{appSoundEnabled=!!sound.checked;appHapticsEnabled=!!haptics.checked;saveAppPrefs();effects.textContent='効果音 '+(appSoundEnabled?'オン':'オフ')+'・触覚フィードバック '+(appHapticsEnabled?'オン':'オフ');if(appSoundEnabled)playSound('check');if(appHapticsEnabled)vibrateDevice([0,18,25,18])};
+  const updateEffects=()=>{appSoundEnabled=!!sound.checked;appHapticsEnabled=!!haptics.checked;saveAppPrefs();effects.textContent='効果音 '+(appSoundEnabled?'オン':'オフ')+'・アプリ内の振動 '+(appHapticsEnabled?'オン':'オフ');if(appSoundEnabled)playSound('check');if(appHapticsEnabled)vibrateDevice([0,18,25,18])};
   sound.addEventListener('change',updateEffects);haptics.addEventListener('change',updateEffects);$('btnTestHaptics').addEventListener('click',()=>{try{if(!window.AndroidBridge||typeof AndroidBridge.testHaptics!=='function'){effects.textContent='Android側の振動機能に接続できません';return}effects.textContent=AndroidBridge.testHaptics()}catch(e){effects.textContent='振動テスト失敗: '+String(e)}});
   const enabled=$('reminderEnabled'),time=$('reminderTime'),status=$('reminderStatus');
   if(window.AndroidBridge&&typeof AndroidBridge.getReminderSettings==='function'){
