@@ -293,6 +293,21 @@ button:focus-visible,[role="button"]:focus-visible,input:focus-visible,select:fo
   </div>
   <div class="view" id="view-set">
     <div class="card">
+      <h3>勉強リマインダー</h3>
+      <p class="small" style="line-height:1.7;margin:8px 0 12px;">勉強を始めるきっかけを、毎日ひとつ。通知は好きな時刻に設定できます。</p>
+      <label style="display:flex;align-items:center;gap:10px;margin:10px 0;font-size:14px;"><input id="reminderEnabled" type="checkbox" style="width:20px;height:20px;">毎日通知する</label>
+      <div class="field" style="margin-bottom:8px;"><label for="reminderTime">通知する時刻</label><input id="reminderTime" type="time" value="19:00" style="width:100%;border-radius:10px;padding:10px 12px;"></div>
+      <button class="pill primary w-full" id="btnSaveReminder">通知設定を保存</button>
+      <div id="reminderStatus" class="small" aria-live="polite" style="line-height:1.7;margin-top:10px;">通知はオフです。</div>
+    </div>
+    <div class="card">
+      <h3>やる気スイッチ</h3>
+      <p class="small" style="line-height:1.7;margin:8px 0 12px;">操作したときの音や振動を、自分が心地よい設定に。</p>
+      <label style="display:flex;align-items:center;gap:10px;margin:12px 0;font-size:14px;"><input id="appSoundEnabled" type="checkbox" checked style="width:20px;height:20px;">効果音を鳴らす</label>
+      <label style="display:flex;align-items:center;gap:10px;margin:12px 0;font-size:14px;"><input id="appHapticsEnabled" type="checkbox" checked style="width:20px;height:20px;">触覚フィードバックを使う</label>
+      <div class="small" id="effectsStatus" aria-live="polite">効果音と振動はオンです。</div>
+    </div>
+    <div class="card">
       <h3>教科を追加</h3>
       <div class="todoAdd"><input id="subjInput" placeholder="教科名（例：情報）"><button class="roundBtn" id="btnSubjAdd" aria-label="教科を追加">＋</button></div>
       <div id="subjList" style="margin-top:10px;"></div>
@@ -495,11 +510,17 @@ window.addEventListener('focus',reviveAudio);
 window.addEventListener('pageshow',reviveAudio);
 window.addEventListener('resume',reviveAudio);
 setInterval(()=>{if(audioCtx && audioCtx.state==='closed')destroyAudioGraph()},3000);
-function vibrateDevice(pattern){if(navigator.vibrate)navigator.vibrate(pattern||[200,100,200])}
+const APP_PREFS_KEY='sl2_app_prefs';
+let appSoundEnabled=true,appHapticsEnabled=true;
+function loadAppPrefs(){try{const p=JSON.parse(localStorage.getItem(APP_PREFS_KEY)||'{}');appSoundEnabled=p.sound!==false;appHapticsEnabled=p.haptics!==false}catch(e){appSoundEnabled=true;appHapticsEnabled=true}}
+function saveAppPrefs(){try{localStorage.setItem(APP_PREFS_KEY,JSON.stringify({sound:appSoundEnabled,haptics:appHapticsEnabled}))}catch(e){}}
+loadAppPrefs();
+function vibrateDevice(pattern){if(!appHapticsEnabled)return;const p=Array.isArray(pattern)?pattern:(pattern?[0,Number(pattern)]:[0,200,100,200]);if(window.AndroidBridge&&typeof AndroidBridge.vibratePattern==='function'){try{AndroidBridge.vibratePattern(JSON.stringify(p));return}catch(e){}}if(navigator.vibrate)navigator.vibrate(p)}
 function tone(freq,dur,opts={}){const ctx=audioCtx;if(!ctx||ctx.state!=='running')return;const{delay=0,vol=0.16,type='sine',wet=0}=opts,t=ctx.currentTime+delay;try{const o=ctx.createOscillator();o.type=type;o.frequency.setValueAtTime(freq,t);const g=ctx.createGain();g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(vol,t+0.008);g.gain.exponentialRampToValueAtTime(0.0001,t+dur);o.connect(g);g.connect(audioMaster);if(wet>0&&audioDelay){const wg=ctx.createGain();wg.gain.value=wet;g.connect(wg);wg.connect(audioDelay)}o.start(t);o.stop(t+dur+0.05)}catch(e){}}
 const SOUND={tap:()=>{tone(620,.06,{vol:.11})},start:()=>{tone(392,.12,{vol:.15});tone(523,.16,{delay:.09,vol:.16,wet:.3})},pause:()=>{tone(523,.12,{vol:.15});tone(392,.12,{delay:.09,vol:.14})},reset:()=>{tone(330,.11,{vol:.14});tone(262,.14,{delay:.09,vol:.14})},check:()=>{tone(660,.10,{vol:.14});tone(880,.12,{delay:.08,vol:.15});tone(1046,.18,{delay:.16,vol:.16,wet:.4})},success:()=>{tone(523,.10,{vol:.15});tone(659,.10,{delay:.09,vol:.15});tone(784,.22,{delay:.18,vol:.17,wet:.5})},bigSave:()=>{tone(523,.12,{vol:.15});tone(659,.12,{delay:.08,vol:.15});tone(784,.14,{delay:.16,vol:.16});tone(1046,.32,{delay:.24,vol:.18,wet:.55});tone(130,.16,{delay:.24,vol:.13,type:'triangle'})},delete:()=>{tone(220,.10,{vol:.14});tone(165,.14,{delay:.09,vol:.13})},save:()=>{tone(587,.09,{vol:.14});tone(784,.13,{delay:.09,vol:.15,wet:.3})},change:()=>{tone(440,.06,{vol:.12});tone(554,.08,{delay:.06,vol:.12})},error:()=>{tone(180,.12,{vol:.11,type:'square'});tone(140,.18,{delay:.11,vol:.11,type:'square'})}};
 let _lastSoundAt=0;
 function playSound(name){
+  if(!appSoundEnabled)return;
   const now=performance.now();
   if(now-_lastSoundAt<60)return;
   _lastSoundAt=now;
@@ -745,10 +766,28 @@ $('btnCopyBackup').onclick=async()=>{refreshBackupBox();const ta=$('backupOut');
 $('btnDownloadBackup').onclick=()=>{refreshBackupBox();if(window.AndroidBridge&&typeof AndroidBridge.saveBackup==='function'){AndroidBridge.saveBackup($('backupOut').value);return}const blob=new Blob([$('backupOut').value],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`sutalog_backup_${todayKey()}.json`;document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);toast('ファイルに保存しました')};
 $('btnRestore').onclick=()=>{const v=$('restoreIn').value.trim();if(!v)return;if(!confirm('現在のデータは上書きされます。復元しますか？'))return;try{const data=JSON.parse(v);if(!data.sessions)throw 0;DB=normalizeDB(data);invalidateSessionsCache();invalidateSubjects();saveDB();toast('復元しました');renderTodos();renderCalendar();renderMaterials();renderSubjList();refreshBackupBox()}catch{playSound('error');toast('コードが正しくありません')}};
 $('btnReset').onclick=()=>{if(!confirm('本当にすべてのデータを削除しますか？この操作は取り消せません。'))return;DB=normalizeDB(null);invalidateSessionsCache();invalidateSubjects();saveDB();toast('削除しました');renderTodos();renderCalendar();renderMaterials();renderSubjList();refreshBackupBox()};
+function initAppSettings(){
+  const sound=$('appSoundEnabled'),haptics=$('appHapticsEnabled'),effects=$('effectsStatus');
+  sound.checked=appSoundEnabled;haptics.checked=appHapticsEnabled;
+  const updateEffects=()=>{appSoundEnabled=!!sound.checked;appHapticsEnabled=!!haptics.checked;saveAppPrefs();effects.textContent='効果音 '+(appSoundEnabled?'オン':'オフ')+'・触覚フィードバック '+(appHapticsEnabled?'オン':'オフ');if(appSoundEnabled)playSound('check');if(appHapticsEnabled)vibrateDevice([0,18,25,18])};
+  sound.addEventListener('change',updateEffects);haptics.addEventListener('change',updateEffects);
+  const enabled=$('reminderEnabled'),time=$('reminderTime'),status=$('reminderStatus');
+  if(window.AndroidBridge&&typeof AndroidBridge.getReminderSettings==='function'){
+    try{const r=JSON.parse(AndroidBridge.getReminderSettings());enabled.checked=!!r.enabled;time.value=String(r.hour).padStart(2,'0')+':'+String(r.minute).padStart(2,'0');status.textContent=r.enabled?'毎日 '+time.value+' に通知します。':'通知はオフです。'}catch(e){}
+  }else{status.textContent='通知はAndroidアプリ版で利用できます。'}
+  $('btnSaveReminder').addEventListener('click',()=>{
+    const parts=(time.value||'19:00').split(':').map(Number),hour=parts[0]||0,minute=parts[1]||0,on=!!enabled.checked;
+    if(window.AndroidBridge&&typeof AndroidBridge.configureDailyReminder==='function'){
+      AndroidBridge.configureDailyReminder(hour,minute,on);
+      status.textContent=on?'毎日 '+time.value+' に通知する設定を保存しました。通知の許可を求められたら「許可」を選んでね。':'通知をオフにしました。';
+      if(appSoundEnabled)playSound('success');vibrateDevice([0,22,35,22]);
+    }else status.textContent='この機能はAndroidアプリ版で利用できます。';
+  });
+}
 /* ============================================================
    初期化
 ============================================================ */
-carryOverTodos();renderTodos();refreshMatSubjectOptions();refreshBackupBox();updateMatBadge();adjustNavPosition();setTimeout(adjustNavPosition,200);setTimeout(adjustNavPosition,800);
+carryOverTodos();renderTodos();refreshMatSubjectOptions();refreshBackupBox();updateMatBadge();initAppSettings();adjustNavPosition();setTimeout(adjustNavPosition,200);setTimeout(adjustNavPosition,800);
 if(location.protocol!=='file:'&&'serviceWorker'in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('./sw.js').catch(()=>{})})}
 </script>
 </body>

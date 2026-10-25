@@ -1,10 +1,13 @@
 package com.yourname.stulogplus
 
+import android.Manifest
 import android.app.Activity
 import android.content.Intent
 import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
+import android.os.Build
+import android.content.pm.PackageManager
 import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
@@ -16,6 +19,7 @@ class MainActivity : Activity() {
     private lateinit var webView: WebView
     private var pendingBackupJson: String? = null
     private val createBackupRequest = 7301
+    private val notificationPermissionRequest = 7302
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -57,6 +61,45 @@ class MainActivity : Activity() {
     }
 
     private inner class BackupBridge {
+        @JavascriptInterface
+        fun getReminderSettings(): String {
+            val prefs = getSharedPreferences(StudyReminderScheduler.PREFS, MODE_PRIVATE)
+            val enabled = prefs.getBoolean("enabled", false)
+            val hour = prefs.getInt("hour", 19)
+            val minute = prefs.getInt("minute", 0)
+            return """{"enabled":$enabled,"hour":$hour,"minute":$minute}"""
+        }
+
+        @JavascriptInterface
+        fun configureDailyReminder(hour: Int, minute: Int, enabled: Boolean) {
+            runOnUiThread {
+                StudyReminderScheduler.configure(this@MainActivity, hour, minute, enabled)
+                if (enabled && Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                    requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), notificationPermissionRequest)
+                }
+            }
+        }
+
+        @JavascriptInterface
+        fun vibratePattern(patternJson: String) {
+            if (!getSharedPreferences(StudyReminderScheduler.PREFS, MODE_PRIVATE).getBoolean("haptics_enabled", true)) return
+            try {
+                val timingsJson = org.json.JSONArray(patternJson)
+                val timings = LongArray(timingsJson.length()) { i -> timingsJson.optLong(i, 0L).coerceAtLeast(0L) }
+                if (timings.isEmpty()) return
+                val vibrator = if (Build.VERSION.SDK_INT >= 31) {
+                    val manager = getSystemService(android.content.Context.VIBRATOR_MANAGER_SERVICE) as android.os.VibratorManager
+                    manager.defaultVibrator
+                } else {
+                    @Suppress("DEPRECATION")
+                    getSystemService(VIBRATOR_SERVICE) as android.os.Vibrator
+                }
+                if (vibrator.hasVibrator()) {
+                    if (Build.VERSION.SDK_INT >= 26) vibrator.vibrate(android.os.VibrationEffect.createWaveform(timings, -1))
+                    else { @Suppress("DEPRECATION") vibrator.vibrate(timings, -1) }
+                }
+            } catch (_: Exception) { }
+        }
         @JavascriptInterface
         fun saveBackup(json: String) {
             runOnUiThread {
