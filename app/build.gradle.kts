@@ -15,6 +15,25 @@ android {
         versionName = "1.1.0"
     }
 
+    // On GitHub Actions, explicitly use the cached keystore. The Android
+    // Gradle Plugin's implicit debug key was not matching the cached file.
+    signingConfigs {
+        create("ciDebug") {
+            storeFile = file("${System.getenv("HOME") ?: System.getProperty("user.home")}/.android/debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
+    buildTypes {
+        getByName("debug") {
+            if (System.getenv("CI") == "true") {
+                signingConfig = signingConfigs.getByName("ciDebug")
+            }
+        }
+    }
+
     sourceSets["main"].java.setSrcDirs(listOf("src/main/kotlin"))
 
     compileOptions {
