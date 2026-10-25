@@ -96,7 +96,7 @@ class MainActivity : Activity() {
                 }
                 if (vibrator.hasVibrator()) {
                     if (Build.VERSION.SDK_INT >= 26) vibrator.vibrate(android.os.VibrationEffect.createWaveform(timings, -1))
-                    else { @Suppress("DEPRECATION") vibrator.vibrate(timings, -1) }
+                    else vibrator.vibrate(timings, -1)
                 }
             } catch (_: Exception) { }
         }
