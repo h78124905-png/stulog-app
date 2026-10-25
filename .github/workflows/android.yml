@@ -18,3 +18,10 @@ jobs:
           gradle-version: '8.2'
       - name: Build debug APK
         run: gradle assembleDebug --no-daemon
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: stulog-app-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14
