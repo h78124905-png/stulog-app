@@ -13,7 +13,7 @@ import java.util.Calendar
 
 object StudyReminderScheduler {
     const val PREFS = "stulog_app_settings"
-    const val CHANNEL_ID = "study_reminders"
+    const val CHANNEL_ID = "study_reminders_v2"
     const val ACTION_REMINDER = "com.yourname.stulogplus.STUDY_REMINDER"
     private const val REQUEST_CODE = 8127
 
@@ -57,7 +57,7 @@ object StudyReminderScheduler {
     private fun createChannel(context: Context) {
         if (Build.VERSION.SDK_INT >= 26) {
             val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            if (manager.getNotificationChannel(CHANNEL_ID) == null) manager.createNotificationChannel(NotificationChannel(CHANNEL_ID, "勉強リマインダー", NotificationManager.IMPORTANCE_DEFAULT).apply { description = "毎日の勉強を始めるきっかけを知らせます" })
+            if (manager.getNotificationChannel(CHANNEL_ID) == null) manager.createNotificationChannel(NotificationChannel(CHANNEL_ID, "勉強リマインダー", NotificationManager.IMPORTANCE_DEFAULT).apply { description = "毎日の勉強を始めるきっかけを知らせます"; enableVibration(true); vibrationPattern = longArrayOf(0, 250, 120, 250) })
         }
     }
 }
